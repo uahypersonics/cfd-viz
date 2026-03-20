@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfd-viz"
+dynamic = ["version"]
+description = "Lightweight visualization CLI for structured CFD datasets"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Christoph Hader", email = "chader@arizona.edu"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+keywords = ["cfd", "visualization", "mesh", "contour", "matplotlib"]
+
+dependencies = [
+    "cfd-io>=0.1.0",
+    "matplotlib>=3.7.0",
+    "numpy>=1.24.0",
+    "typer>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+docs = [
+    "mkdocs>=1.5,<2",
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.24",
+]
+
+[project.scripts]
+cfd-viz = "cfd_viz.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/uahypersonics/cfd-viz"
+Repository = "https://github.com/uahypersonics/cfd-viz"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+# --------------------------------------------------
+# coverage
+# --------------------------------------------------
+[tool.coverage.run]
+source = ["cfd_viz"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+]
