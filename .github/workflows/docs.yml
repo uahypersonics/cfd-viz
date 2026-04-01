@@ -21,6 +21,9 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install cfd-io from tag
+        run: pip install "cfd-io @ git+https://github.com/uahypersonics/cfd-io.git@v0.2.4"
+
       - name: Install dependencies
         run: pip install -e ".[docs]"
 
