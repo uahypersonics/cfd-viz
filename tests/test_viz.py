@@ -197,3 +197,143 @@ class TestCLI:
         result = runner.invoke(app, ["contour", str(h5_flow), "--field", "bogus"])
         assert result.exit_code != 0
         assert "bogus" in result.output
+
+
+@pytest.fixture()
+def tecplot_lst_dat(tmp_path):
+    """Write a synthetic LST-style Tecplot ASCII table file."""
+    ni, nj, nk = 6, 5, 3
+
+    # build simple rectilinear LST axes
+    s_vec = np.linspace(0.1, 0.6, ni)
+    freq_vec = np.linspace(100000.0, 300000.0, nj)
+    beta_vec = np.array([0.0, 5.0, 10.0])
+
+    # assemble arrays with shape (ni, nj, nk)
+    s = np.repeat(s_vec[:, np.newaxis, np.newaxis], nj, axis=1)
+    s = np.repeat(s, nk, axis=2)
+
+    freq = np.repeat(freq_vec[np.newaxis, :, np.newaxis], ni, axis=0)
+    freq = np.repeat(freq, nk, axis=2)
+
+    beta = np.repeat(beta_vec[np.newaxis, np.newaxis, :], ni, axis=0)
+    beta = np.repeat(beta, nj, axis=1)
+
+    # synthetic positive field so positive-rounded policy is stable
+    im_alpha = 10.0 + 20.0 * np.exp(-3.0 * s) + 0.00001 * freq + 0.1 * beta
+
+    # write Tecplot POINT format (i-fastest, then j, then k)
+    out = tmp_path / "lst_table.dat"
+    with open(out, "w", encoding="utf-8") as fobj:
+        fobj.write('TITLE = "synthetic lst"\n')
+        fobj.write('VARIABLES = "s", "freq.", "beta", "-im(alpha)"\n')
+        fobj.write(f"ZONE I={ni}, J={nj}, K={nk}, F=POINT\n")
+        for k in range(nk):
+            for j in range(nj):
+                for i in range(ni):
+                    fobj.write(
+                        f"{s[i, j, k]:.9e} {freq[i, j, k]:.9e} "
+                        f"{beta[i, j, k]:.9e} {im_alpha[i, j, k]:.9e}\n"
+                    )
+
+    return out
+
+
+class TestLSTCLI:
+    """Tests for cfd-viz lst contour command."""
+
+    def test_lst_contours_all_k(self, tecplot_lst_dat, tmp_path):
+        out_dir = tmp_path / "plots"
+        result = runner.invoke(
+            app,
+            [
+                "lst",
+                "contours",
+                str(tecplot_lst_dat),
+                "--all-k",
+                "--out-dir",
+                str(out_dir),
+                "--prefix",
+                "alpi_kc",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "wrote 3 plot(s)" in result.output
+        assert (out_dir / "alpi_kc_0000.png").exists()
+        assert (out_dir / "alpi_kc_0005.png").exists()
+        assert (out_dir / "alpi_kc_0010.png").exists()
+
+    def test_lst_contours_single_k(self, tecplot_lst_dat, tmp_path):
+        out_dir = tmp_path / "single"
+        result = runner.invoke(
+            app,
+            [
+                "lst",
+                "contours",
+                str(tecplot_lst_dat),
+                "--single-k",
+                "--k-index",
+                "2",
+                "--out-dir",
+                str(out_dir),
+                "--prefix",
+                "alpi_kc",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "wrote 1 plot(s)" in result.output
+        assert (out_dir / "alpi_kc_0005.png").exists()
+
+    def test_lst_contours_single_k_show_calls_matplotlib_show(
+        self,
+        tecplot_lst_dat,
+        tmp_path,
+        monkeypatch,
+    ):
+        out_dir = tmp_path / "show_single"
+        called = {"n": 0}
+
+        def _fake_show() -> None:
+            called["n"] += 1
+
+        monkeypatch.setattr("cfd_viz.lst.plt.show", _fake_show)
+
+        result = runner.invoke(
+            app,
+            [
+                "lst",
+                "contours",
+                str(tecplot_lst_dat),
+                "--single-k",
+                "--k-index",
+                "1",
+                "--show",
+                "--out-dir",
+                str(out_dir),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert called["n"] == 1
+        assert (out_dir / "alpi_kc_0000.png").exists()
+
+    def test_lst_contours_all_k_show_emits_warning(self, tecplot_lst_dat, tmp_path):
+        out_dir = tmp_path / "show_all"
+        result = runner.invoke(
+            app,
+            [
+                "lst",
+                "contours",
+                str(tecplot_lst_dat),
+                "--all-k",
+                "--show",
+                "--out-dir",
+                str(out_dir),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "warning: --show ignored with --all-k" in result.output
+        assert (out_dir / "alpi_kc_0000.png").exists()

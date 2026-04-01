@@ -17,6 +17,12 @@ app = typer.Typer(
     add_completion=False,
 )
 
+lst_app = typer.Typer(
+    name="lst",
+    help="Visualize LST table-like datasets (for example growth-rate outputs).",
+    no_args_is_help=True,
+)
+
 
 # --------------------------------------------------
 # helpers
@@ -125,3 +131,65 @@ def contour(
 
     # plot (show interactively only when not saving to file)
     plot_contour(x, y, data, field_name=field, levels=levels, title=title, filename=output, show=output is None)
+
+
+# --------------------------------------------------
+# lst contours subcommand
+# --------------------------------------------------
+@lst_app.command("contours")
+def lst_contours(
+    path: Path = typer.Argument(..., help="Path to LST data file (Tecplot ASCII or any cfd-io-supported format)."),
+    field: str = typer.Option("-im(alpha)", "--field", "-f", help="Contour field name or comma-separated aliases."),
+    xvar: str = typer.Option("s", "--xvar", help="X-axis variable name or comma-separated aliases."),
+    yvar: str = typer.Option("freq,freq.", "--yvar", help="Y-axis variable name or comma-separated aliases."),
+    kvar: str = typer.Option("beta", "--kvar", help="K-sweep variable name or comma-separated aliases."),
+    all_k: bool = typer.Option(True, "--all-k/--single-k", help="Render all k-planes or only one selected plane."),
+    k_index: int = typer.Option(1, "--k-index", "-k", min=1, help="1-based k index when --single-k is used."),
+    out_dir: Path = typer.Option(Path("."), "--out-dir", "-o", help="Directory for output PNG files."),
+    prefix: str = typer.Option("alpi_kc", "--prefix", "-p", help="Output filename prefix before beta token."),
+    levels_policy: str = typer.Option("positive-rounded", "--levels-policy", help="Contour levels policy: global-auto or positive-rounded."),
+    levels_count: int = typer.Option(60, "--levels-count", min=2, help="Number of contour levels."),
+    clip_below: bool = typer.Option(True, "--clip-below/--no-clip-below", help="Clip values below minimum contour level."),
+    dpi: int = typer.Option(300, "--dpi", min=72, help="PNG output DPI."),
+    show: bool = typer.Option(False, "--show", help="Display plot window (single-k recommended)."),
+) -> None:
+    """Render LST contours using mapped variables from a flow-only dataset."""
+    from cfd_viz.lst import render_lst_contours
+
+    # keep batch mode render-first to avoid opening many windows
+    if show and all_k:
+        typer.echo("warning: --show ignored with --all-k; files will be rendered only", err=True)
+        show = False
+
+    try:
+        files = render_lst_contours(
+            path=path,
+            field=field,
+            xvar=xvar,
+            yvar=yvar,
+            kvar=kvar,
+            all_k=all_k,
+            k_index=k_index,
+            out_dir=out_dir,
+            prefix=prefix,
+            levels_policy=levels_policy,
+            levels_count=levels_count,
+            clip_below=clip_below,
+            dpi=dpi,
+            show=show,
+        )
+    except Exception as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    if files:
+        typer.echo(f"wrote {len(files)} plot(s)")
+        typer.echo(f"first: {files[0]}")
+        typer.echo(f"last:  {files[-1]}")
+    else:
+        typer.echo("no plots generated", err=True)
+        raise typer.Exit(code=1)
+
+
+# register lst command group
+app.add_typer(lst_app, name="lst")
