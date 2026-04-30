@@ -10,6 +10,7 @@ authors:
     orcid: "https://orcid.org/0000-0002-0956-000X"
 repository-code: "https://github.com/uahypersonics/cfd-viz"
 url: "https://uahypersonics.github.io/cfd-viz"
+doi: "10.5281/zenodo.19376186"
 license: BSD-3-Clause
 keywords:
   - computational fluid dynamics

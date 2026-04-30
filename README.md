@@ -4,6 +4,7 @@ Lightweight visualization CLI for structured CFD datasets.
 
 [![Test](https://github.com/uahypersonics/cfd-viz/actions/workflows/test.yml/badge.svg)](https://github.com/uahypersonics/cfd-viz/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/uahypersonics/cfd-viz/branch/main/graph/badge.svg)](https://codecov.io/gh/uahypersonics/cfd-viz)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19376186.svg)](https://doi.org/10.5281/zenodo.19376186)
 [![PyPI](https://img.shields.io/pypi/v/cfd-viz)](https://pypi.org/project/cfd-viz/)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://uahypersonics.github.io/cfd-viz/)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
