@@ -11,7 +11,7 @@ authors:
 repository-code: "https://github.com/uahypersonics/cfd-viz"
 url: "https://uahypersonics.github.io/cfd-viz"
 doi: "10.5281/zenodo.19376186"
-license: BSD-3-Clause
+license: GPL-3.0-or-later
 keywords:
   - computational fluid dynamics
   - visualization
