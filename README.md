@@ -6,7 +6,7 @@ Lightweight visualization CLI for structured CFD datasets.
 [![codecov](https://codecov.io/gh/uahypersonics/cfd-viz/branch/main/graph/badge.svg)](https://codecov.io/gh/uahypersonics/cfd-viz)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19376186.svg)](https://doi.org/10.5281/zenodo.19376186)
 [![PyPI](https://img.shields.io/pypi/v/cfd-viz)](https://pypi.org/project/cfd-viz/)
-[![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://uahypersonics.github.io/cfd-viz/)
+[![Docs](https://img.shields.io/badge/docs-zensical-blue)](https://uahypersonics.github.io/cfd-viz/)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-≥3.11-blue.svg)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
