@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from typer.testing import CliRunner
 
 from cfd_viz.cli import app
 from cfd_viz.contour import plot_contour
+from cfd_viz.lst import render_standard_lst_contours
 from cfd_viz.mesh import plot_mesh
 
 # --------------------------------------------------
@@ -221,19 +223,21 @@ def tecplot_lst_dat(tmp_path):
 
     # synthetic positive field so positive-rounded policy is stable
     im_alpha = 10.0 + 20.0 * np.exp(-3.0 * s) + 0.00001 * freq + 0.1 * beta
+    nfac3 = 0.5 * im_alpha
 
     # write Tecplot POINT format (i-fastest, then j, then k)
-    out = tmp_path / "lst_table.dat"
+    out = tmp_path / "growth_rate_with_nfact_amps.dat"
     with open(out, "w", encoding="utf-8") as fobj:
         fobj.write('TITLE = "synthetic lst"\n')
-        fobj.write('VARIABLES = "s", "freq.", "beta", "-im(alpha)"\n')
+        fobj.write('VARIABLES = "s", "freq.", "beta", "-im(alpha)", "Nfac3"\n')
         fobj.write(f"ZONE I={ni}, J={nj}, K={nk}, F=POINT\n")
         for k in range(nk):
             for j in range(nj):
                 for i in range(ni):
                     fobj.write(
                         f"{s[i, j, k]:.9e} {freq[i, j, k]:.9e} "
-                        f"{beta[i, j, k]:.9e} {im_alpha[i, j, k]:.9e}\n"
+                        f"{beta[i, j, k]:.9e} {im_alpha[i, j, k]:.9e} "
+                        f"{nfac3[i, j, k]:.9e}\n"
                     )
 
     return out
@@ -241,6 +245,188 @@ def tecplot_lst_dat(tmp_path):
 
 class TestLSTCLI:
     """Tests for cfd-viz lst contour command."""
+
+    def test_lst_init_writes_default_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["lst", "init"])
+
+        config_path = tmp_path / "cfd-viz-lst.toml"
+        assert result.exit_code == 0
+        assert config_path.exists()
+        config_text = config_path.read_text(encoding="utf-8")
+        assert "[contour.alpi]" in config_text
+        assert "[contour.nfac]" in config_text
+        assert "contour_var" not in config_text
+        assert "#--------------------------------------------------\n# input" in config_text
+        assert "[[fields]]" not in config_text
+
+    def test_lst_init_requires_force_to_replace(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / "cfd-viz-lst.toml"
+        config_path.write_text("custom", encoding="utf-8")
+
+        refused = runner.invoke(app, ["lst", "init"])
+        replaced = runner.invoke(app, ["lst", "init", "--force"])
+
+        assert refused.exit_code == 1
+        assert "use --force to replace it" in refused.output
+        assert replaced.exit_code == 0
+        assert "[contour]" in config_path.read_text(encoding="utf-8")
+
+    def test_lst_contours_discovers_local_config(self, tecplot_lst_dat, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / "cfd-viz-lst.toml"
+        config_path.write_text(
+            """
+[input]
+path = "growth_rate_with_nfact_amps.dat"
+dimensions = 3
+x_var = "s"
+y_var = "freq,freq."
+z_var = "beta"
+
+[contour.nfac]
+variable = "Nfac3"
+
+[output]
+directory = "configured"
+dpi = 120
+
+[z_axis]
+all_planes = false
+index = 2
+show_label = true
+
+[style]
+use_tex = false
+
+""".strip(),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["lst", "contours"])
+
+        assert result.exit_code == 0, result.output
+        assert "wrote 1 plot(s)" in result.output
+        assert (tmp_path / "configured" / "nfac_kc_0005.png").exists()
+
+    def test_lst_contours_cli_values_override_explicit_config(self, tecplot_lst_dat, tmp_path):
+        config_dir = tmp_path / "settings"
+        config_dir.mkdir()
+        config_path = config_dir / "custom.toml"
+        config_path.write_text(
+            """
+[input]
+path = "../growth_rate_with_nfact_amps.dat"
+dimensions = 3
+x_var = "s"
+y_var = "freq,freq."
+z_var = "beta"
+
+[contour.nfac]
+variable = "Nfac3"
+
+[output]
+directory = "configured"
+
+[z_axis]
+all_planes = false
+index = 2
+
+[style]
+use_tex = false
+
+""".strip(),
+            encoding="utf-8",
+        )
+        override_dir = tmp_path / "override"
+
+        result = runner.invoke(
+            app,
+            [
+                "lst",
+                "contours",
+                "--config",
+                str(config_path),
+                "--k-index",
+                "1",
+                "--out-dir",
+                str(override_dir),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (override_dir / "nfac_kc_0000.png").exists()
+
+    def test_lst_contours_renders_two_dimensional_input(self, tmp_path, monkeypatch):
+        data_path = tmp_path / "lst_2d.dat"
+        data_path.write_text(
+            """
+TITLE = "synthetic 2d lst"
+VARIABLES = "s", "freq.", "Nfac3"
+ZONE I=3, J=3, F=POINT
+0.0 1000.0 0.0
+0.5 1000.0 1.0
+1.0 1000.0 2.0
+0.0 2000.0 1.0
+0.5 2000.0 2.0
+1.0 2000.0 3.0
+0.0 3000.0 2.0
+0.5 3000.0 3.0
+1.0 3000.0 4.0
+""".strip(),
+            encoding="utf-8",
+        )
+        config_path = tmp_path / "cfd-viz-lst.toml"
+        config_path.write_text(
+            """
+[input]
+path = "lst_2d.dat"
+dimensions = 2
+x_var = "s"
+y_var = "freq,freq."
+
+[contour.nfac]
+variable = "Nfac3"
+
+[z_axis]
+show_label = false
+
+[style]
+use_tex = false
+""".strip(),
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["lst", "contours"])
+
+        assert result.exit_code == 0, result.output
+        assert "wrote 1 plot(s)" in result.output
+        assert (tmp_path / "nfac_kc.png").exists()
+
+    def test_standard_lst_api_uses_default_file(self, tecplot_lst_dat, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        files = render_standard_lst_contours(out_dir="api_plots", all_k=False, k_index=1)
+
+        assert [path.name for path in files] == [
+            "alpi_kc_0000.png",
+            "nfac_kc_0000.png",
+        ]
+
+    def test_lst_contours_defaults_to_standard_file_and_fields(
+        self, tecplot_lst_dat, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["lst", "contours"])
+
+        assert result.exit_code == 0
+        assert "wrote 6 plot(s)" in result.output
+        assert (tmp_path / "alpi_kc_0000.png").exists()
+        assert (tmp_path / "nfac_kc_0000.png").exists()
 
     def test_lst_contours_all_k(self, tecplot_lst_dat, tmp_path):
         out_dir = tmp_path / "plots"
@@ -255,6 +441,8 @@ class TestLSTCLI:
                 str(out_dir),
                 "--prefix",
                 "alpi_kc",
+                "--field",
+                "-im(alpha)",
             ],
         )
 
@@ -279,6 +467,8 @@ class TestLSTCLI:
                 str(out_dir),
                 "--prefix",
                 "alpi_kc",
+                "--field",
+                "-im(alpha)",
             ],
         )
 
@@ -294,9 +484,18 @@ class TestLSTCLI:
     ):
         out_dir = tmp_path / "show_single"
         called = {"n": 0}
+        rendered = {}
 
         def _fake_show() -> None:
             called["n"] += 1
+            figure = plt.gcf()
+            plot_axis = figure.axes[0]
+            colorbar_axis = figure.axes[-1]
+            rendered["colorbar_ticks"] = colorbar_axis.get_yticks()
+            rendered["outline_visible"] = all(
+                spine.get_visible() for spine in plot_axis.spines.values()
+            )
+            rendered["title"] = plot_axis.get_title()
 
         monkeypatch.setattr("cfd_viz.lst.plt.show", _fake_show)
 
@@ -307,6 +506,8 @@ class TestLSTCLI:
                 "contours",
                 str(tecplot_lst_dat),
                 "--single-k",
+                "--field",
+                "-im(alpha)",
                 "--k-index",
                 "1",
                 "--show",
@@ -317,6 +518,9 @@ class TestLSTCLI:
 
         assert result.exit_code == 0
         assert called["n"] == 1
+        assert len(rendered["colorbar_ticks"]) == 2
+        assert rendered["outline_visible"] is True
+        assert rendered["title"] == r"$k_c$ = 0"
         assert (out_dir / "alpi_kc_0000.png").exists()
 
     def test_lst_contours_all_k_show_emits_warning(self, tecplot_lst_dat, tmp_path):
@@ -328,6 +532,8 @@ class TestLSTCLI:
                 "contours",
                 str(tecplot_lst_dat),
                 "--all-k",
+                "--field",
+                "-im(alpha)",
                 "--show",
                 "--out-dir",
                 str(out_dir),
