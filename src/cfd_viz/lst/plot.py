@@ -12,9 +12,9 @@ from __future__ import annotations
 import logging
 import math
 import shutil
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
