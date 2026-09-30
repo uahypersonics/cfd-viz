@@ -13,6 +13,7 @@ from .plot import (
     plt as plt,
 )
 from .plot import (
+    render_configured_lst_collection,
     render_configured_lst_contours,
     render_lst_contours,
     render_standard_lst_contours,
@@ -24,6 +25,7 @@ __all__ = [
     "LSTPlotConfig",
     "default_lst_config",
     "load_lst_config",
+    "render_configured_lst_collection",
     "render_configured_lst_contours",
     "render_lst_contours",
     "render_standard_lst_contours",

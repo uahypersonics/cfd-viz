@@ -9,7 +9,12 @@ from typer.testing import CliRunner
 
 from cfd_viz.cli import app
 from cfd_viz.contour import plot_contour
-from cfd_viz.lst import render_standard_lst_contours
+from cfd_viz.lst import (
+    LSTFieldConfig,
+    LSTPlotConfig,
+    render_configured_lst_collection,
+    render_standard_lst_contours,
+)
 from cfd_viz.mesh import plot_mesh
 
 # --------------------------------------------------
@@ -414,6 +419,34 @@ use_tex = false
         assert [path.name for path in files] == [
             "alpi_kc_0000.png",
             "nfac_kc_0000.png",
+        ]
+
+    def test_lst_collection_renders_files_with_shared_field_bounds(
+        self, tecplot_lst_dat, tmp_path
+    ):
+        config = LSTPlotConfig(
+            fields=(
+                LSTFieldConfig(
+                    name="-im(alpha)",
+                    prefix="alpi_kc",
+                    label=r"$-\alpha_i$ [1/m]",
+                ),
+            ),
+            output_dir=tmp_path / "collection",
+            all_k=False,
+            use_tex=False,
+        )
+
+        files = render_configured_lst_collection(
+            config,
+            [tecplot_lst_dat, tecplot_lst_dat],
+            prefix_suffixes=["first", "second"],
+            single_plane=True,
+        )
+
+        assert [path.name for path in files] == [
+            "alpi_kc_first_0000.png",
+            "alpi_kc_second_0000.png",
         ]
 
     def test_lst_contours_defaults_to_standard_file_and_fields(

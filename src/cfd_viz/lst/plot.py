@@ -14,6 +14,7 @@ import math
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -341,6 +342,125 @@ def render_configured_lst_contours(config: LSTPlotConfig, *, show: bool = False)
         written.extend(files)
 
     return written
+
+
+# --------------------------------------------------
+# public API: render a collection with shared contour bounds
+# --------------------------------------------------
+def render_configured_lst_collection(
+    config: LSTPlotConfig,
+    input_files: Sequence[str | Path],
+    *,
+    output_dir: str | Path | None = None,
+    prefix_suffixes: Sequence[str | None] | None = None,
+    single_plane: bool = False,
+    show: bool = False,
+) -> list[Path]:
+    """Render multiple LST files with one contour range per configured field.
+
+    Args:
+        config: Validated LST plotting configuration.
+        input_files: Ordered input files to render.
+        output_dir: Optional output-directory override.
+        prefix_suffixes: Optional filename suffix corresponding to each input.
+        single_plane: Render only the first z-plane from each input.
+        show: Display figures interactively.
+
+    Returns:
+        Paths to all rendered contour figures.
+
+    Raises:
+        ValueError: If no inputs are provided or suffix counts do not match.
+        FileNotFoundError: If an input file does not exist.
+    """
+
+    # normalize and validate collection inputs
+    paths = [Path(path) for path in input_files]
+    if not paths:
+        raise ValueError("at least one LST input file is required")
+    for path in paths:
+        if not path.exists():
+            raise FileNotFoundError(f"input file not found: {path}")
+
+    suffixes = list(prefix_suffixes) if prefix_suffixes is not None else [None] * len(paths)
+    if len(suffixes) != len(paths):
+        raise ValueError("prefix_suffixes must match the number of input files")
+
+    # compute shared bounds only when comparing multiple files
+    render_config = config
+    if len(paths) > 1:
+        render_config = _apply_shared_contour_bounds(config, paths)
+
+    # render each file through the standard configured renderer
+    written: list[Path] = []
+    selected_output_dir = Path(output_dir) if output_dir is not None else config.output_dir
+    for path, suffix in zip(paths, suffixes, strict=True):
+        fields = render_config.fields
+        if suffix is not None:
+            fields = tuple(
+                replace(field, prefix=f"{field.prefix}_{suffix}") for field in fields
+            )
+
+        file_config = replace(
+            render_config,
+            input_path=path,
+            output_dir=selected_output_dir,
+            fields=fields,
+            all_k=False if single_plane else render_config.all_k,
+            k_index=1 if single_plane else render_config.k_index,
+        )
+        files = render_configured_lst_contours(file_config, show=show)
+        written.extend(files)
+
+    return written
+
+
+# --------------------------------------------------
+# compute shared bounds for a configured collection
+# --------------------------------------------------
+def _apply_shared_contour_bounds(
+    config: LSTPlotConfig, input_files: Sequence[Path]
+) -> LSTPlotConfig:
+    """Return a config with one derived range per field across all inputs."""
+
+    from cfd_io import read_file
+
+    fields = []
+    for field in config.fields:
+        if field.level_min is not None and field.level_max is not None:
+            fields.append(field)
+            continue
+
+        global_min: float | None = None
+        global_max: float | None = None
+        for path in input_files:
+            dataset = read_file(str(path))
+            field_name = _pick_flow_var(dataset.flow, field.name)
+            values = dataset.flow[field_name].data
+            local_min = float(np.nanmin(values))
+            local_max = float(np.nanmax(values))
+            global_min = local_min if global_min is None else min(global_min, local_min)
+            global_max = local_max if global_max is None else max(global_max, local_max)
+
+        if global_min is None or global_max is None:
+            raise ValueError(f"could not compute contour bounds for {field.name!r}")
+
+        levels_policy = field.levels_policy or config.levels_policy
+        levels = _build_levels(
+            np.asarray([global_min, global_max]),
+            policy=levels_policy,
+            count=field.levels_count or config.levels_count,
+        )
+        fields.append(
+            replace(
+                field,
+                level_min=float(levels[0]),
+                level_max=float(levels[-1]),
+            )
+        )
+
+    configured = replace(config, fields=tuple(fields))
+    return configured
 
 
 # --------------------------------------------------
