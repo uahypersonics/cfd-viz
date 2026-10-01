@@ -445,8 +445,8 @@ use_tex = false
         )
 
         assert [path.name for path in files] == [
-            "alpi_kc_first_0000.png",
-            "alpi_kc_second_0000.png",
+            "alpi_kc_first.png",
+            "alpi_kc_second.png",
         ]
 
     def test_lst_contours_defaults_to_standard_file_and_fields(

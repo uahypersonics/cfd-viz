@@ -32,7 +32,7 @@ class LSTFieldConfig:
 class LSTPlotConfig:
     """Complete configuration for standard LST contour rendering."""
 
-    input_path: Path = DEFAULT_LST_INPUT
+    input_path: Path | None = DEFAULT_LST_INPUT
     output_dir: Path = Path(".")
     dimensions: int = 3
     fields: tuple[LSTFieldConfig, ...] = field(
@@ -80,7 +80,7 @@ _DEFAULT_CONFIG_TEXT = r"""#--------------------------------------------------
 # input
 #--------------------------------------------------
 [input]
-# path to the LST Tecplot data file
+# path to the LST Tecplot data file; leave empty when the caller discovers inputs
 path = "growth_rate_with_nfact_amps.dat"
 
 # number of dimensions in the input data: 2 or 3
@@ -276,7 +276,9 @@ def load_lst_config(path: str | Path = DEFAULT_LST_CONFIG_PATH) -> LSTPlotConfig
     fields = _read_contours(contour_values, defaults.fields)
     base_dir = config_path.resolve().parent
 
-    input_path = _resolve_path(base_dir, input_values.get("path", defaults.input_path))
+    input_path = _resolve_optional_path(
+        base_dir, input_values.get("path", defaults.input_path)
+    )
     output_dir = _resolve_path(base_dir, output_values.get("directory", defaults.output_dir))
 
     config = LSTPlotConfig(
@@ -429,6 +431,17 @@ def _resolve_path(base_dir: Path, value: object) -> Path:
     if not path.is_absolute():
         path = base_dir / path
 
+    return path
+
+
+def _resolve_optional_path(base_dir: Path, value: object) -> Path | None:
+    """Resolve a configured path while preserving an empty value as unset."""
+
+    raw_path = str(value).strip()
+    if not raw_path:
+        return None
+
+    path = _resolve_path(base_dir, raw_path)
     return path
 
 

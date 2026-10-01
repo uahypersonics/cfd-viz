@@ -273,16 +273,26 @@ def render_standard_lst_contours(
 # --------------------------------------------------
 # public API: render an LST plotting configuration
 # --------------------------------------------------
-def render_configured_lst_contours(config: LSTPlotConfig, *, show: bool = False) -> list[Path]:
+def render_configured_lst_contours(
+    config: LSTPlotConfig,
+    *,
+    show: bool = False,
+    include_plane_token: bool = True,
+) -> list[Path]:
     """Render all fields selected by an LST plotting configuration.
 
     Args:
         config: Validated LST plotting configuration.
         show: Display figures interactively.
+        include_plane_token: Append the z-plane value to 3-D output filenames.
 
     Returns:
         Paths to all rendered contour figures.
     """
+
+    # require callers to resolve workflow-discovered inputs before rendering
+    if config.input_path is None:
+        raise ValueError("input.path is empty; provide an LST input file")
 
     written: list[Path] = []
     for field_config in config.fields:
@@ -338,6 +348,7 @@ def render_configured_lst_contours(config: LSTPlotConfig, *, show: bool = False)
             z_scale=config.z_scale,
             z_min=config.z_min,
             z_max=config.z_max,
+            include_plane_token=include_plane_token,
         )
         written.extend(files)
 
@@ -409,7 +420,11 @@ def render_configured_lst_collection(
             all_k=False if single_plane else render_config.all_k,
             k_index=1 if single_plane else render_config.k_index,
         )
-        files = render_configured_lst_contours(file_config, show=show)
+        files = render_configured_lst_contours(
+            file_config,
+            show=show,
+            include_plane_token=suffix is None,
+        )
         written.extend(files)
 
     return written
@@ -507,6 +522,7 @@ def render_lst_contours(
     z_scale: float = 1.0,
     z_min: float | None = None,
     z_max: float | None = None,
+    include_plane_token: bool = True,
 ) -> list[Path]:
     """Render LST contours from a flow-only table dataset.
 
@@ -550,6 +566,7 @@ def render_lst_contours(
         z_scale: Multiplier from input z units to displayed units.
         z_min: Optional displayed lower z limit used to select planes.
         z_max: Optional displayed upper z limit used to select planes.
+        include_plane_token: Append the z-plane value to 3-D output filenames.
 
     Returns:
         List of written PNG paths.
@@ -648,8 +665,11 @@ def render_lst_contours(
             y_k = y[:, :, idx]
             f_k = data[:, :, idx]
             z_value = float(np.median(z[:, :, idx])) * z_scale
-            z_token = f"{int(round(float(np.median(z[:, :, idx])))):04d}"
-            out_file = out_dir / f"{prefix}_{z_token}.png"
+            if include_plane_token:
+                z_token = f"{int(round(float(np.median(z[:, :, idx])))):04d}"
+                out_file = out_dir / f"{prefix}_{z_token}.png"
+            else:
+                out_file = out_dir / f"{prefix}.png"
 
         # clip out-of-range values if requested
         if clip_below:

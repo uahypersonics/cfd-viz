@@ -123,6 +123,19 @@ use_tex = false
     assert config.fields[0].prefix == "nfac2_kc"
 
 
+def test_load_lst_config_preserves_empty_input_for_workflow_discovery(
+    tmp_path: Path,
+) -> None:
+    """An empty input path must remain unset for workflow-owned discovery."""
+
+    config_path = tmp_path / "discover.toml"
+    config_path.write_text('[input]\npath = ""\n', encoding="utf-8")
+
+    config = load_lst_config(config_path)
+
+    assert config.input_path is None
+
+
 def test_load_lst_config_rejects_one_sided_contour_bounds(tmp_path: Path) -> None:
     """A partial explicit contour range must produce a configuration error."""
 
