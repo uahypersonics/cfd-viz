@@ -65,7 +65,7 @@ def _load_lst_command_config(config_path: Path | None):
 def cmd_lst_init(
     output: Annotated[
         Path,
-        typer.Argument(help="LST plotting configuration to create."),
+        typer.Option("--output", "-o", help="LST plotting configuration to create."),
     ] = Path("cfd-viz-lst.toml"),
     force: Annotated[
         bool,
