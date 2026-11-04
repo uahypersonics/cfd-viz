@@ -24,6 +24,27 @@ def version_callback(value: bool) -> None:
 
 
 # --------------------------------------------------
+# verbose callback
+# --------------------------------------------------
+def verbose_callback(value: bool) -> None:
+    """Configure console logging; --verbose adds debug output from this tool.
+
+    Other packages (cfd-io, matplotlib, h5py, ...) stay at the default level,
+    so --verbose shows this tool's debug messages without theirs.
+    """
+
+    # default console logging for every logger
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)-8s %(message)s",
+    )
+
+    # debug output from this tool only; the packages it calls keep their levels
+    if value:
+        logging.getLogger("cfd_viz").setLevel(logging.DEBUG)
+
+
+# --------------------------------------------------
 # root application callback
 # --------------------------------------------------
 def cli_callback(
@@ -37,15 +58,16 @@ def cli_callback(
             is_eager=True,
         ),
     ] = False,
-    debug: Annotated[
+    verbose: Annotated[
         bool,
-        typer.Option("--debug", help="Enable debug logging."),
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable verbose (debug) output.",
+            callback=verbose_callback,
+        ),
     ] = False,
 ) -> None:
     """cfd-viz: lightweight CFD visualization."""
 
-    logging_level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        level=logging_level,
-        format="%(levelname)-8s %(message)s",
-    )
+    del version_requested, verbose
